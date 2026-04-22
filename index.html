@@ -31,7 +31,7 @@
       
       /* --- 背景圖設定 --- */
       /* 請將下方 url 替換成你設計的 1920x1080 圖片路徑 */
-      background-image: url('background.png'); 
+      background-image: url('bg_1920x1080.jpg'); 
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -149,7 +149,7 @@
     // ==========================================
     // ⚙️ 在這裡設定你的檔案名稱與想要的「縮小倍率」 (只影響 AR 實體大小)
     // ==========================================
-    const modelFileName = 'Module.glb'; // 你的原始模型檔案名稱
+    const modelFileName = 'Moon.glb'; // 你的原始模型檔案名稱
     const scaleFactor = 0.1;         // 0.01 代表把原始物理尺寸縮小 100 倍！(如果還是太大就改 0.001)
     // ==========================================
 
@@ -216,7 +216,8 @@
       }, { binary: true });
 
     }, undefined, (error) => {
-      console.error('載入原始模型失敗，請確認 Moon.glb 檔案是否存在', error);
+      // 🎯 將寫死的 Moon.glb 改成變數，並加上本機伺服器提示
+      console.error(`載入原始模型失敗，請確認 ${modelFileName} 檔案是否存在，或是否忘記使用 Live Server 開啟網頁？`, error);
       btnText.innerText = '找不到模型檔案';
     });
   </script>
