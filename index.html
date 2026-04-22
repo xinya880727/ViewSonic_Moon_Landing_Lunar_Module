@@ -7,16 +7,6 @@
   
   <!-- 引入 Google 的 model-viewer -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-  
-  <!-- 引入 Three.js 核心與轉換工具，用於在背景動態縮小模型 -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-      }
-    }
-  </script>
 
   <style>
     * {
@@ -30,7 +20,6 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       
       /* --- 背景圖設定 --- */
-      /* 請將下方 url 替換成你設計的 1920x1080 圖片路徑 */
       background-image: url('bg_1920x1080.jpg'); 
       background-size: cover;
       background-position: center;
@@ -86,21 +75,13 @@
       transform: translateX(-50%);
       cursor: pointer;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-      
-      /* 🎯 加入 !important 強制覆蓋 model-viewer 的隱藏機制，並確保在最上層 */
-      display: flex !important;
-      z-index: 100;
-      
+      display: flex;
       align-items: center;
       gap: 8px;
       transition: all 0.2s;
     }
     .ar-button:active {
       transform: translateX(-50%) scale(0.95);
-    }
-    .ar-button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
     }
   </style>
 </head>
@@ -111,15 +92,16 @@
   </div>
 
   <!-- 
-    加入 disable-pan 屬性：確保永遠依賴中線旋轉
-    移除無效的 scale 屬性
-    🎯 將 camera-orbit 的距離從 100% 改為 200%，讓攝影機拉遠，預設模型視覺就會縮小
+    1. src="Moon.glb": 直接交給官方套件讀取，保證絕對不會出錯！
+    2. disable-pan: 鎖定中線旋轉
+    3. camera-orbit 150%: 網頁版視角拉遠 (視覺縮小)
+    4. 移除 ar-scale="fixed": 讓使用者在 AR 裡面可以用雙指自由縮放模型大小
   -->
   <model-viewer 
     id="my-viewer"
+    src="Moon.glb"
     alt="我的 3D 模型"
     ar 
-    ar-scale="fixed"
     ar-modes="webxr scene-viewer quick-look" 
     camera-controls 
     disable-pan
@@ -130,97 +112,15 @@
     environment-image="neutral"
     exposure="1.2">
     
-    <!-- 🎯 使用一個隱藏的空 div 佔用 slot="ar-button"，這樣就能徹底隱藏官方預設按鈕 -->
-    <div slot="ar-button" style="display: none;"></div>
+    <!-- 
+      🎯 關鍵：加上 slot="ar-button" 並放在 model-viewer 裡面
+      這樣官方套件就會自動幫你判斷：「電腦版隱藏按鈕、手機版顯示按鈕」！
+    -->
+    <button slot="ar-button" class="ar-button" id="ar-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <span class="btn-text">啟動 AR 模式</span>
+    </button>
   </model-viewer>
-
-  <!-- 🎯 將我們自訂的按鈕「移出」 model-viewer 標籤外，保證它絕對不會被隱藏 -->
-  <button class="ar-button" id="ar-btn" disabled>
-    <span class="btn-text">模型處理中...</span>
-  </button>
-
-  <!-- 自動縮小 3D 模型的魔法腳本 -->
-  <script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-    import { USDZExporter } from 'three/addons/exporters/USDZExporter.js';
-
-    // ==========================================
-    // ⚙️ 在這裡設定你的檔案名稱與想要的「縮小倍率」 (只影響 AR 實體大小)
-    // ==========================================
-    const modelFileName = 'Moon.glb'; // 你的原始模型檔案名稱
-    const scaleFactor = 1;         // 0.01 代表把原始物理尺寸縮小 100 倍！(如果還是太大就改 0.001)
-    // ==========================================
-
-    const viewer = document.getElementById('my-viewer');
-    const arBtn = document.getElementById('ar-btn');
-    const btnText = arBtn.querySelector('.btn-text');
-
-    // 🎯 新增：手動監聽按鈕點擊事件，觸發 AR (電腦版點擊會自動彈出 QR Code)
-    arBtn.addEventListener('click', () => {
-      viewer.activateAR();
-    });
-
-    // 載入原始的巨大模型
-    const loader = new GLTFLoader();
-    loader.load(modelFileName, async (gltf) => {
-      const scene = gltf.scene;
-      
-      // 🎯 核心魔法升級：將縮放「烘焙 (Bake)」到模型的每個頂點中
-      // 解決 iOS/Android AR 系統強制忽略整體 Scale 的問題，強行改變物理尺寸
-      const processedGeometries = new Set();
-      scene.traverse((child) => {
-        if (child.isMesh) {
-          // 改變幾何體真正的頂點座標
-          if (!processedGeometries.has(child.geometry)) {
-            child.geometry.scale(scaleFactor, scaleFactor, scaleFactor);
-            processedGeometries.add(child.geometry);
-          }
-        }
-        if (child.position) {
-          // 如果模型有多個零件，把它們之間的距離也同步縮小，防止模型解體
-          child.position.multiplyScalar(scaleFactor);
-        }
-      });
-
-      // 匯出成新的（已經縮小的）GLB 給網頁與 Android
-      const gltfExporter = new GLTFExporter();
-      gltfExporter.parse(scene, async (newGltf) => {
-        const glbBlob = new Blob([newGltf], { type: 'application/octet-stream' });
-        const glbUrl = URL.createObjectURL(glbBlob);
-        
-        // 將縮小後的 GLB 餵給 model-viewer
-        viewer.src = glbUrl;
-
-        // 同時，我們幫你自動生出一個 iOS 專用的 USDZ！(你以後不需要自己轉檔 usdz 了)
-        try {
-          const usdzExporter = new USDZExporter();
-          const usdzData = await usdzExporter.parse(scene);
-          const usdzBlob = new Blob([usdzData], { type: 'model/vnd.usdz+zip' });
-          viewer.setAttribute('ios-src', URL.createObjectURL(usdzBlob));
-        } catch (e) {
-          console.warn('iOS USDZ 轉換失敗', e);
-        }
-
-        // 處理完成，開放 AR 按鈕讓使用者點擊
-        arBtn.disabled = false;
-        btnText.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          啟動 AR 模式
-        `;
-
-      }, (error) => {
-        console.error('縮小 GLB 失敗', error);
-        btnText.innerText = '模型處理失敗';
-      }, { binary: true });
-
-    }, undefined, (error) => {
-      // 🎯 將寫死的 Moon.glb 改成變數，並加上本機伺服器提示
-      console.error(`載入原始模型失敗，請確認 ${modelFileName} 檔案是否存在，或是否忘記使用 Live Server 開啟網頁？`, error);
-      btnText.innerText = '找不到模型檔案';
-    });
-  </script>
 
 </body>
 </html>
