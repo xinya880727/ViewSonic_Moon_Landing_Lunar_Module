@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apollo 11 : Moon Landing</title>
   
-  <!-- 引入 Google 的 model-viewer -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
   <style>
@@ -91,15 +90,8 @@
     <h3>雙指捏合可縮放，拖曳可旋轉。使用行動裝置可以點擊下方按鈕，開啟 AR 擴增實境，在現實世界中探索登月艙模型 ！</h3>
   </div>
 
-  <!-- 
-    1. src="Moon.glb": 直接交給官方套件讀取，保證絕對不會出錯！
-    2. disable-pan: 鎖定中線旋轉
-    3. camera-orbit 150%: 網頁版視角拉遠 (視覺縮小)
-    4. 移除 ar-scale="fixed": 讓使用者在 AR 裡面可以用雙指自由縮放模型大小
-  -->
   <model-viewer 
     id="my-viewer"
-    src="Moon.glb"
     alt="我的 3D 模型"
     ar 
     ar-modes="webxr scene-viewer quick-look" 
@@ -112,15 +104,26 @@
     environment-image="neutral"
     exposure="1.2">
     
-    <!-- 
-      🎯 關鍵：加上 slot="ar-button" 並放在 model-viewer 裡面
-      這樣官方套件就會自動幫你判斷：「電腦版隱藏按鈕、手機版顯示按鈕」！
-    -->
     <button slot="ar-button" class="ar-button" id="ar-btn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
       <span class="btn-text">啟動 AR 模式</span>
     </button>
   </model-viewer>
+
+  <script>
+    // ==========================================
+    const modelFileName = 'Moon.glb';
+    const scaleFactor = 0.1;
+    // ==========================================
+
+    const viewer = document.getElementById('my-viewer');
+    
+    // 設定模型路徑
+    viewer.src = modelFileName;
+    
+    // 設定模型縮放大小 (套用 scaleFactor 到 X, Y, Z 三個軸)
+    viewer.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
+  </script>
 
 </body>
 </html>
